@@ -75,16 +75,17 @@ WantedBy=default.target
 EOF
 
 tee "$HOME/.config/systemd/user/unison-sync.timer" <<EOF
+
 [Unit]
-Description=Run Unison SMB sync periodically
+Description=Run Unison Sync every 5 minutes
 
 [Timer]
-OnBootSec=10min
-OnUnitActiveSec=1h
+OnBootSec=30
+OnUnitActiveSec=5min
 Unit=unison-sync.service
 
 [Install]
-WantedBy=timers.target
+WantedBy=default.target
 EOF
 
 # Reload systemd and enable services
@@ -93,8 +94,18 @@ systemctl --user enable autochmod.service
 systemctl --user enable unison-sync.service
 systemctl --user enable unison-sync.timer
 
+
+echo "🔄 Starting and enabling systemd user services..."
+
+systemctl --user daemon-reload
+systemctl --user enable autochmod.service
+systemctl --user enable unison-sync.service
+systemctl --user enable unison-sync.timer
+
+systemctl --user start autochmod.service
+systemctl --user start unison-sync.service
+systemctl --user start unison-sync.timer
+
+echo "✅ All services started and enabled. Unison will sync every 5 minutes."
 echo -e "\n✅ Setup complete!"
-echo "You can start syncing with:"
-echo "  systemctl --user start autochmod.service"
-echo "  systemctl --user start unison-sync.service"
-echo "  systemctl --user start unison-sync.timer"
+
