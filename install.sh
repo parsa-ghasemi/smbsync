@@ -2,86 +2,75 @@
 
 set -e
 
-# === Create required folders ===
+echo "🔧 Configuring SMB Sync..."
+
+read -rp "Enter SMB share (e.g. //192.168.1.100/myshare): " SMB_SHARE
+read -rp "Enter mount point (default: ~/smbmount): " MOUNT_POINT
+MOUNT_POINT=${MOUNT_POINT:-$HOME/smbmount}
+
+read -rp "Enter local sync path (default: ~/smbsync-local): " LOCAL_SYNC
+LOCAL_SYNC=${LOCAL_SYNC:-$HOME/smbsync-local}
+
+read -rp "Enter SMB username: " SMB_USERNAME
+read -rsp "Enter SMB password: " SMB_PASSWORD
+echo ""
+
 CONFIG_DIR="$HOME/.smbsync"
 mkdir -p "$CONFIG_DIR"
-cd "$CONFIG_DIR"
 
-# === Config file ===
-CONFIG_FILE="$CONFIG_DIR/config.env"
-
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "🔧 Configuring SMB Sync..."
-  read -p "Enter SMB share (e.g. //192.168.1.100/myshare): " smb_share
-  read -p "Enter mount point (default: ~/smbmount): " mount_path
-  mount_path="${mount_path:-$HOME/smbmount}"
-  read -p "Enter local sync path (default: ~/smbsync-local): " local_path
-  local_path="${local_path:-$HOME/smbsync-local}"
-  read -p "Enter SMB username: " smb_user
-  read -s -p "Enter SMB password: " smb_pass
-  echo
-
-  mkdir -p "$mount_path"
-  mkdir -p "$local_path"
-
-  cat <<EOF > "$CONFIG_FILE"
-SMB_SHARE="$smb_share"
-MOUNT_PATH="$mount_path"
-LOCAL_PATH="$local_path"
-USERNAME="$smb_user"
-PASSWORD="$smb_pass"
+# Save configuration
+cat <<EOF > "$CONFIG_DIR/config.env"
+SMB_SHARE="$SMB_SHARE"
+MOUNT_POINT="$MOUNT_POINT"
+LOCAL_SYNC="$LOCAL_SYNC"
+SMB_USERNAME="$SMB_USERNAME"
+SMB_PASSWORD="$SMB_PASSWORD"
 EOF
-else
-  echo "✅ Using existing config at $CONFIG_FILE"
-fi
 
-source "$CONFIG_FILE"
+# Define a fixed hostname for Unison to avoid archive mismatch
+echo 'export UNISONLOCALHOSTNAME=smbsync-host' > "$CONFIG_DIR/env.sh"
 
-# === mount.sh ===
-cat <<EOF > "$CONFIG_DIR/mount.sh"
+# Create mount script
+cat <<'EOF' > "$CONFIG_DIR/mount.sh"
 #!/bin/bash
-source "\$HOME/.smbsync/config.env"
+source "$(dirname "$0")/config.env"
+mkdir -p "$MOUNT_POINT"
 
-mkdir -p "\$MOUNT_PATH"
-if ! mountpoint -q "\$MOUNT_PATH"; then
-  mount -t cifs "\$SMB_SHARE" "\$MOUNT_PATH" -o username=\$USERNAME,password=\$PASSWORD || {
-    echo "❌ Failed to mount SMB share."
-    exit 1
-  }
-fi
+mountpoint -q "$MOUNT_POINT" || {
+  echo "Mounting SMB share $SMB_SHARE to $MOUNT_POINT..."
+  echo "$SMB_PASSWORD" | sudo -S mount -t cifs "$SMB_SHARE" "$MOUNT_POINT" -o username="$SMB_USERNAME",password="$SMB_PASSWORD",uid=$(id -u),gid=$(id -g)
+}
 EOF
 chmod +x "$CONFIG_DIR/mount.sh"
 
-# === unison-sync.sh ===
-cat <<EOF > "$CONFIG_DIR/unison-sync.sh"
+# Create chmod watcher
+cat <<'EOF' > "$CONFIG_DIR/autochmod.sh"
 #!/bin/bash
-source "\$HOME/.smbsync/config.env"
-
-"\$HOME/.smbsync/mount.sh"
-
-unison "\$MOUNT_PATH" "\$LOCAL_PATH" -batch -logfile "\$HOME/.smbsync/unison.log"
-EOF
-chmod +x "$CONFIG_DIR/unison-sync.sh"
-
-# === autochmod.sh ===
-cat <<EOF > "$CONFIG_DIR/autochmod.sh"
-#!/bin/bash
-source "\$HOME/.smbsync/config.env"
-
-inotifywait -mrq -e create --format '%w%f' "\$LOCAL_PATH" | while read NEWFILE; do
-  chmod 755 "\$NEWFILE"
-  echo "[\$(date)] chmod 755 \$NEWFILE" >> "\$HOME/.smbsync/autochmod.log"
+source "$(dirname "$0")/config.env"
+inotifywait -m -r -e create "$MOUNT_POINT" --format '%w%f' | while read -r file; do
+  chmod 755 "$file"
+  echo "chmod 755 $file" >> "$CONFIG_DIR/autochmod.log"
 done
 EOF
 chmod +x "$CONFIG_DIR/autochmod.sh"
 
-# === Setup cron job ===
-(crontab -l 2>/dev/null; echo "*/5 * * * * $CONFIG_DIR/unison-sync.sh") | crontab -u "$USER" -
+# Create unison sync script
+cat <<'EOF' > "$CONFIG_DIR/unison-sync.sh"
+#!/bin/bash
+source "$(dirname "$0")/config.env"
+source "$(dirname "$0")/env.sh"
 
-# Run autochmod in background
-pkill -f "$CONFIG_DIR/autochmod.sh" 2>/dev/null || true
-nohup "$CONFIG_DIR/autochmod.sh" >/dev/null 2>&1 &
+"$CONFIG_DIR/mount.sh"
 
-# === Done ===
-echo "✅ SMB Sync setup complete. Syncing every 5 minutes via cron."
-echo "Logs: \$HOME/.smbsync/unison.log, autochmod.log"
+mkdir -p "$LOCAL_SYNC"
+
+echo "Running Unison sync..."
+unison "$MOUNT_POINT" "$LOCAL_SYNC" -auto -batch -log=true -logfile "$CONFIG_DIR/unison.log" -ignore 'Path .Trash*'
+EOF
+chmod +x "$CONFIG_DIR/unison-sync.sh"
+
+# Add to cron (every 5 min)
+(crontab -l 2>/dev/null | grep -v "$CONFIG_DIR/unison-sync.sh" ; echo "*/5 * * * * bash \"$CONFIG_DIR/unison-sync.sh\"") | crontab -
+
+echo "✅ SMB Sync setup completed!"
+echo "📁 Config stored in $CONFIG_DIR"
