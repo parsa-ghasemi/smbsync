@@ -7,10 +7,10 @@ DEF_REMOTE="//192.168.1.100/shared"
 DEF_USER="guest"
 
 # Ask for inputs with visible defaults
-read -e -p "Enter mount point (default: $DEF_MOUNT): " -i "$DEF_MOUNT" MOUNT_POINT
-read -e -p "Enter local mirror path (default: $DEF_MIRROR): " -i "$DEF_MIRROR" MIRROR_PATH
-read -e -p "Enter remote address (default: $DEF_REMOTE): " -i "$DEF_REMOTE" REMOTE_ADDR
-read -e -p "Enter SMB username (default: $DEF_USER): " -i "$DEF_USER" SMB_USER
+read -e -p "Enter mount point: " -i "$DEF_MOUNT" MOUNT_POINT
+read -e -p "Enter local mirror path: " -i "$DEF_MIRROR" MIRROR_PATH
+read -e -p "Enter remote address: " -i "$DEF_REMOTE" REMOTE_ADDR
+read -e -p "Enter SMB username: " -i "$DEF_USER" SMB_USER
 read -sp "Enter SMB password: " SMB_PASS
 echo
 
@@ -89,6 +89,10 @@ WantedBy=default.target
 EOF
 
 # Reload systemd and enable services
+
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+
 systemctl --user daemon-reload
 systemctl --user enable autochmod.service
 systemctl --user enable unison-sync.service
