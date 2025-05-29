@@ -29,6 +29,6 @@ sudo apt install unison inotify-tools cifs-utils
 
 برای نصب سریع این کد را اجرا کنید:
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/start.sh)
+bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/install.sh)
 
 ```
