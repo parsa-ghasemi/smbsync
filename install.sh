@@ -7,28 +7,39 @@ set -e
 # Installs SMB mount, two-way Unison sync,
 # autochmod service, and periodic Unison execution via systemd.
 
-# 1. Read configuration from user
-read -rp "Enter mount point path (e.g. /mnt/onlinedata): " MOUNT_POINT
-read -rp "Enter local mirror path (e.g. /home/$(whoami)/onlinedata): " DEST
-read -rp "Enter remote SMB address (e.g. //192.168.1.10/shared): " REMOTE
-read -rp "Enter path to SMB credentials file (e.g. /etc/smb-credentials): " CREDENTIALS
-read -rp "Enter folder path to watch for autochmod (e.g. /home/$(whoami)/onlinedata): " WATCH_DIR
+# 1. Read configuration from user with defaults
+DEFAULT_MOUNT="/mnt/onlinedata"
+DEFAULT_DEST="/home/$(whoami)/onlinedata"
+DEFAULT_REMOTE="//192.168.1.10/shared"
+DEFAULT_CREDS="/etc/smb-credentials"
+DEFAULT_WATCH="$DEFAULT_DEST"
+
+read -rp "Enter mount point path [${DEFAULT_MOUNT}]: " MOUNT_POINT
+MOUNT_POINT=${MOUNT_POINT:-$DEFAULT_MOUNT}
+
+read -rp "Enter local mirror path [${DEFAULT_DEST}]: " DEST
+DEST=${DEST:-$DEFAULT_DEST}
+
+read -rp "Enter remote SMB address [${DEFAULT_REMOTE}]: " REMOTE
+REMOTE=${REMOTE:-$DEFAULT_REMOTE}
+
+read -rp "Enter path to SMB credentials file [${DEFAULT_CREDS}]: " CREDENTIALS
+CREDENTIALS=${CREDENTIALS:-$DEFAULT_CREDS}
+
+read -rp "Enter folder path to watch for autochmod [${DEFAULT_WATCH}]: " WATCH_DIR
+WATCH_DIR=${WATCH_DIR:-$DEFAULT_WATCH}
 
 # Derived variables
 SOURCE="$MOUNT_POINT/"
 LOG="$DEST/sync_smb.log"
 USER_HOME="/home/$(whoami)"
 
-# 2. Install dependencies
-sudo apt update
-sudo apt install -y cifs-utils rsync inotify-tools unison
-
-# 3. Create directories
+# 2. Create directories
 sudo mkdir -p "$MOUNT_POINT"
 mkdir -p "$DEST"
 mkdir -p "$USER_HOME/.unison"
 
-# 4. Generate Unison profile
+# 3. Generate Unison profile
 cat <<EOF > "$USER_HOME/.unison/cloudsync.prf"
 root = $DEST
 root = $MOUNT_POINT
@@ -39,7 +50,7 @@ log = true
 logfile = $USER_HOME/unison_sync.log
 EOF
 
-# 5. Create mount & sync script
+# 4. Create mount & sync script
 cat <<EOF > "$USER_HOME/smbsync.sh"
 #!/bin/bash
 if ! mountpoint -q "$MOUNT_POINT"; then
@@ -56,10 +67,11 @@ fi
 EOF
 chmod +x "$USER_HOME/smbsync.sh"
 
-# 6. Create autochmod script
+# 5. Create autochmod script
 cat <<EOF > "$USER_HOME/autochmod.sh"
 #!/bin/bash
 # Watch folder and chmod new/modified files to 775
+echo "Starting autochmod on $WATCH_DIR"
 inotifywait -m -r -e create -e modify --format '%w%f' "$WATCH_DIR" | while read FILE; do
     if [ -f "$FILE" ]; then
         chmod 775 "$FILE"
@@ -69,7 +81,7 @@ done
 EOF
 chmod +x "$USER_HOME/autochmod.sh"
 
-# 7. Create system-wide systemd services
+# 6. Create system-wide systemd services
 # Use cat | sudo tee to avoid redirection fd issues
 
 # Autochmod service
@@ -113,14 +125,14 @@ Persistent=true
 WantedBy=timers.target
 EOF"
 
-# 8. Reload and enable services
+# 7. Reload and enable services
 sudo systemctl daemon-reload
 sudo systemctl enable autochmod.service
 sudo systemctl start autochmod.service
 sudo systemctl enable unison-sync.timer
 sudo systemctl start unison-sync.timer
 
-# 9. Final instructions
+# 8. Final instructions
 echo "Setup complete!"
 echo "- SMB mount and sync available via: $USER_HOME/smbsync.sh"
 echo "- Autochmod service: autochmod.service"
