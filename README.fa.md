@@ -32,3 +32,13 @@ sudo apt install unison inotify-tools cifs-utils
 bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/install.sh)
 
 ```
+
+##🧹 حذف نصب
+
+
+برای پاک کردن تنظیمات همگام‌سازی **بدون حذف داده‌های شما**، اسکریپت حذف را اجرا کنید:
+
+
+```bash
+sudo bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh)
+```
