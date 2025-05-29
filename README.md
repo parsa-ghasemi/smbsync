@@ -31,3 +31,10 @@ sudo apt install unison inotify-tools cifs-utils
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/install.sh)
 ```
+
+## 🧹 Uninstalling
+
+To remove the synchronization setup **without deleting your data**, run the uninstall script:
+
+```bash
+sudo bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh)
