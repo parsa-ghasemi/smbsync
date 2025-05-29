@@ -77,7 +77,7 @@ set -euo pipefail
 source "$HOME/.smbsync/config.env"
 
 # Run mount script to ensure SMB is mounted
-"$HOME/.smbsync/mount.sh"
+sudo "$HOME/.smbsync/mount.sh"
 
 echo "Running Unison sync..."
 
