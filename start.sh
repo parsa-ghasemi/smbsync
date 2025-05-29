@@ -1,65 +1,130 @@
 #!/bin/bash
 
-# Interactive installer for smb-sync setup
+set -e
 
-echo "== SMB-Sync Setup =="
+echo "=== SMB Sync Setup with Unison & Autochmod ==="
 
-# Get variables
-read -p "Local mirror path (e.g., /home/user/onlinedata): " LOCAL_PATH
-read -p "SMB mount point (e.g., /mnt/onlinedata): " MOUNT_POINT
-read -p "Remote SMB address (e.g., //192.168.1.100/share): " REMOTE
-read -p "Path to smb credentials file (e.g., /etc/smb-credentials): " CREDENTIALS
+read -rp "Enter mount point path (e.g. /mnt/onlinedata): " MOUNT_POINT
+read -rp "Enter local mirror path (e.g. /home/$(whoami)/onlinedata): " DEST
+read -rp "Enter remote SMB address (e.g. //192.168.1.10/shared): " REMOTE
+read -rp "Enter path to SMB credentials file (e.g. /etc/smb-credentials): " CREDENTIALS
+read -rp "Enter folder path to watch for autochmod (e.g. /home/$(whoami)/onlinedata): " WATCH_DIR
 
-# Make folders
-mkdir -p "$LOCAL_PATH"
-sudo mkdir -p "$MOUNT_POINT"
+SOURCE="$MOUNT_POINT/"
+LOG="$DEST/sync_smb.log"
 
-# Setup Unison profile
-mkdir -p ~/.unison
-cat > ~/.unison/cloudsync.prf <<EOF
-root = $LOCAL_PATH
+echo
+echo "Creating mount check and rsync script at $HOME/smbsync.sh"
+
+cat > "$HOME/smbsync.sh" <<EOF
+#!/bin/bash
+if ! mountpoint -q "$MOUNT_POINT"; then
+    echo "[(\$(date))] Mount not active. Attempting to mount..." >> "$LOG"
+    sudo mount -t cifs -o credentials=$CREDENTIALS,iocharset=utf8,uid=\$(id -u),gid=\$(id -g),file_mode=0775,dir_mode=0775 "$REMOTE" "$MOUNT_POINT"
+    sleep 2
+fi
+
+if mountpoint -q "$MOUNT_POINT"; then
+    echo "[(\$(date))] Mount successful. Starting sync..." >> "$LOG"
+    rsync -av --delete "$SOURCE" "$DEST" >> "$LOG" 2>&1
+else
+    echo "[(\$(date))] Mount failed. Skipping sync." >> "$LOG"
+fi
+EOF
+
+chmod +x "$HOME/smbsync.sh"
+
+echo
+echo "Creating Unison profile at $HOME/.unison/cloudsync.prf"
+
+mkdir -p "$HOME/.unison"
+
+cat > "$HOME/.unison/cloudsync.prf" <<EOF
+root = $DEST
 root = $MOUNT_POINT
-
 auto = true
 batch = true
 prefer = newer
 log = true
-logfile = $LOCAL_PATH/unison_sync.log
+logfile = $HOME/unison_sync.log
 EOF
 
-# Setup autochmod script
-cat > ~/autochmod.sh <<EOF
+echo
+echo "Creating autochmod.sh script"
+
+cat > "$HOME/autochmod.sh" <<EOF
 #!/bin/bash
-inotifywait -m -r -e create --format '%w%f' "$LOCAL_PATH" | while read FILE; do
-    if [ -f "\$FILE" ]; then
-        chmod 775 "\$FILE"
-    fi
+# Watch the folder and chmod new/modified files to 775
+
+WATCH_DIR="$WATCH_DIR"
+
+inotifywait -m -r -e create -e modify --format '%w%f' "\$WATCH_DIR" | while read FILE
+do
+    chmod 775 "\$FILE"
 done
 EOF
 
-chmod +x ~/autochmod.sh
+chmod +x "$HOME/autochmod.sh"
 
-# Setup systemd service
-mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/autochmod.service <<EOF
+echo
+echo "Creating systemd user service for autochmod"
+
+mkdir -p "$HOME/.config/systemd/user"
+
+cat > "$HOME/.config/systemd/user/autochmod.service" <<EOF
 [Unit]
-Description=Auto chmod 775 on created files
+Description=Auto chmod on new files in sync folder
+After=network.target
 
 [Service]
-ExecStart=/bin/bash /home/$USER/autochmod.sh
+ExecStart=$HOME/autochmod.sh
 Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=default.target
 EOF
 
-# Enable systemd user service
-systemctl --user daemon-reexec
+echo
+echo "Creating systemd user service and timer for Unison sync every 5 minutes"
+
+cat > "$HOME/.config/systemd/user/unison-sync.service" <<EOF
+[Unit]
+Description=Run Unison sync every 5 minutes
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/unison cloudsync
+EOF
+
+cat > "$HOME/.config/systemd/user/unison-sync.timer" <<EOF
+[Unit]
+Description=Timer to run Unison sync every 5 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+echo
+echo "Reloading systemd user daemon and enabling services..."
+
 systemctl --user daemon-reload
-systemctl --user enable autochmod.service
-systemctl --user start autochmod.service
+systemctl --user enable --now autochmod.service
+systemctl --user enable --now unison-sync.timer
 
-echo "✅ Autochmod systemd service set up."
-
+echo
 echo "Setup complete!"
-echo "Now use 'unison cloudsync' to sync files manually."
+echo " - Mount check & rsync script: $HOME/smbsync.sh"
+echo " - Unison profile: $HOME/.unison/cloudsync.prf"
+echo " - Autochmod service: autochmod.service"
+echo " - Unison timer: unison-sync.timer (runs every 5 minutes)"
+echo
+echo "You can check logs:"
+echo " - Unison log: $HOME/unison_sync.log"
+echo " - SMB sync log: $LOG"
