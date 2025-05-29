@@ -24,7 +24,7 @@
 
 ```bash
 sudo apt update
-sudo apt install unison inotify-tools cifs-utils
+sudo apt install -y cifs-utils rsync inotify-tools unison
 ```
 
 برای نصب سریع این کد را اجرا کنید:
