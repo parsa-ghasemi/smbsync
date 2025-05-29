@@ -1,21 +1,31 @@
 #!/bin/bash
 
-echo "Stopping and disabling systemd user services..."
-systemctl --user stop autochmod.service unison-sync.timer unison-sync.service || true
-systemctl --user disable autochmod.service unison-sync.timer unison-sync.service || true
-systemctl --user daemon-reload
+echo "Starting uninstallation of SMB Sync and AutoChmod services..."
 
-echo "Removing systemd user service files..."
-rm -f "$HOME/.config/systemd/user/autochmod.service" \
-      "$HOME/.config/systemd/user/unison-sync.service" \
-      "$HOME/.config/systemd/user/unison-sync.timer"
+# Define important directories and files (modify if you used different paths)
+SMBSYNC_DIR="$HOME/.smbsync"
+LOCAL_FOLDER="${HOME}/onlinedata"
+CRON_CMD="$SMBSYNC_DIR/unison-sync.sh"
 
-echo "Removing scripts..."
-rm -f "$HOME/autochmod.sh" "$HOME/smbsync.sh"
+echo "Removing cron job for unison-sync.sh..."
 
-echo "Keeping data files and logs intact:"
-echo " - Local mirror folder (e.g. $HOME/onlinedata)"
-echo " - Unison profile (e.g. $HOME/.unison/cloudsync.prf)"
-echo " - Logs (e.g. $HOME/unison_sync.log, sync_smb.log)"
+# Remove the cron job related to unison-sync.sh
+crontab -l 2>/dev/null | grep -v -F "$CRON_CMD" | crontab -
 
-echo "Uninstallation complete."
+echo "Stopping autochmod.sh process if running..."
+
+# Kill any running autochmod.sh processes
+pkill -f "autochmod.sh" && echo "autochmod.sh process stopped." || echo "No running autochmod.sh process found."
+
+echo "Deleting SMB Sync directory and contents..."
+rm -rf "$SMBSYNC_DIR"
+
+echo "Deleting local sync folder..."
+rm -rf "$LOCAL_FOLDER"
+
+echo "Cleaning up log files if any..."
+rm -f "$HOME/.smbsync/unison.log" "$HOME/.smbsync/autochmod.log"
+
+echo "If you mounted any mount points manually, consider removing them separately if no longer needed."
+
+echo "Uninstallation completed successfully."
