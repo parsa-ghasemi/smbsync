@@ -24,7 +24,7 @@ Install them on Debian/Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install unison inotify-tools cifs-utils
+sudo apt install -y cifs-utils rsync inotify-tools unison
 ```
 
 ## Run this one-liner for quick Setup:
