@@ -29,5 +29,5 @@ sudo apt install unison inotify-tools cifs-utils
 
 ## Run this one-liner for quick Setup:
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/start.sh)
+bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/install.sh)
 ```
