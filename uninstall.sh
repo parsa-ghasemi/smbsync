@@ -1,31 +1,32 @@
 #!/bin/bash
 
-echo "Starting uninstallation of SMB Sync and AutoChmod services..."
+echo "🧹 Uninstalling SMB Sync..."
 
-# Define important directories and files (modify if you used different paths)
-SMBSYNC_DIR="$HOME/.smbsync"
-LOCAL_FOLDER="${HOME}/onlinedata"
-CRON_CMD="$SMBSYNC_DIR/unison-sync.sh"
+CONFIG_DIR="$HOME/.smbsync"
+CONFIG_FILE="$CONFIG_DIR/config.env"
 
-echo "Removing cron job for unison-sync.sh..."
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "❌ No installation found."
+  exit 1
+fi
 
-# Remove the cron job related to unison-sync.sh
-crontab -l 2>/dev/null | grep -v -F "$CRON_CMD" | crontab -
+# Load config
+source "$CONFIG_FILE"
 
-echo "Stopping autochmod.sh process if running..."
+# Remove cron job
+(crontab -l | grep -v 'unison-sync.sh' | grep -v 'autochmod.sh') | crontab -
 
-# Kill any running autochmod.sh processes
-pkill -f "autochmod.sh" && echo "autochmod.sh process stopped." || echo "No running autochmod.sh process found."
+# Remove sync folder if it exists and user confirms
+if [[ -d "$LOCAL_SYNC_PATH" ]]; then
+  read -p "⚠️ Do you want to delete your local sync folder at $LOCAL_SYNC_PATH? [y/N]: " confirm
+  if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+    rm -rf "$LOCAL_SYNC_PATH"
+    echo "🗑️ Removed $LOCAL_SYNC_PATH"
+  else
+    echo "ℹ️ Kept $LOCAL_SYNC_PATH"
+  fi
+fi
 
-echo "Deleting SMB Sync directory and contents..."
-rm -rf "$SMBSYNC_DIR"
-
-echo "Deleting local sync folder..."
-rm -rf "$LOCAL_FOLDER"
-
-echo "Cleaning up log files if any..."
-rm -f "$HOME/.smbsync/unison.log" "$HOME/.smbsync/autochmod.log"
-
-echo "If you mounted any mount points manually, consider removing them separately if no longer needed."
-
-echo "Uninstallation completed successfully."
+# Remove config directory
+rm -rf "$CONFIG_DIR"
+echo "✅ Uninstall complete."
