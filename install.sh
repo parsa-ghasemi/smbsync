@@ -4,7 +4,7 @@
 set -e
 
 # SMB Sync Setup with Unison & Autochmod Installer
-# This script installs and configures SMB mounting, two-way Unison sync,
+# Installs SMB mount, two-way Unison sync,
 # autochmod service, and periodic Unison execution via systemd.
 
 # 1. Read configuration from user
@@ -29,7 +29,7 @@ mkdir -p "$DEST"
 mkdir -p "$USER_HOME/.unison"
 
 # 4. Generate Unison profile
-cat > "$USER_HOME/.unison/cloudsync.prf" <<EOF
+cat <<EOF > "$USER_HOME/.unison/cloudsync.prf"
 root = $DEST
 root = $MOUNT_POINT
 auto = true
@@ -40,7 +40,7 @@ logfile = $USER_HOME/unison_sync.log
 EOF
 
 # 5. Create mount & sync script
-cat > "$USER_HOME/smbsync.sh" <<EOF
+cat <<EOF > "$USER_HOME/smbsync.sh"
 #!/bin/bash
 if ! mountpoint -q "$MOUNT_POINT"; then
     echo "[\$(date)] Mount not active. Attempting to mount..." >> "$LOG"
@@ -54,14 +54,12 @@ else
     echo "[\$(date)] Mount failed. Skipping sync." >> "$LOG"
 fi
 EOF
-
 chmod +x "$USER_HOME/smbsync.sh"
 
 # 6. Create autochmod script
-cat > "$USER_HOME/autochmod.sh" <<EOF
+cat <<EOF > "$USER_HOME/autochmod.sh"
 #!/bin/bash
 # Watch folder and chmod new/modified files to 775
-echo "Starting autochmod on $WATCH_DIR"
 inotifywait -m -r -e create -e modify --format '%w%f' "$WATCH_DIR" | while read FILE; do
     if [ -f "$FILE" ]; then
         chmod 775 "$FILE"
@@ -72,10 +70,10 @@ EOF
 chmod +x "$USER_HOME/autochmod.sh"
 
 # 7. Create system-wide systemd services
+# Use cat | sudo tee to avoid redirection fd issues
 
 # Autochmod service
-autochmod_unit="/etc/systemd/system/autochmod.service"
-sudo tee "$autochmod_unit" > /dev/null <<EOF
+sudo bash -c "cat <<EOF | tee /etc/systemd/system/autochmod.service
 [Unit]
 Description=Auto chmod on new files in $WATCH_DIR
 After=network.target
@@ -88,11 +86,10 @@ User=$(whoami)
 
 [Install]
 WantedBy=multi-user.target
-EOF
+EOF"
 
 # Unison sync service and timer
-unison_service="/etc/systemd/system/unison-sync.service"
-sudo tee "$unison_service" > /dev/null <<EOF
+sudo bash -c "cat <<EOF | tee /etc/systemd/system/unison-sync.service
 [Unit]
 Description=One-shot Unison sync between $DEST and $MOUNT_POINT
 After=network.target
@@ -101,10 +98,9 @@ After=network.target
 Type=oneshot
 ExecStart=/usr/bin/unison cloudsync
 User=$(whoami)
-EOF
+EOF"
 
-unison_timer="/etc/systemd/system/unison-sync.timer"
-sudo tee "$unison_timer" > /dev/null <<EOF
+sudo bash -c "cat <<EOF | tee /etc/systemd/system/unison-sync.timer
 [Unit]
 Description=Run Unison sync every 5 minutes
 
@@ -115,7 +111,7 @@ Persistent=true
 
 [Install]
 WantedBy=timers.target
-EOF
+EOF"
 
 # 8. Reload and enable services
 sudo systemctl daemon-reload
