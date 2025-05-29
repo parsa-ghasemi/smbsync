@@ -1,10 +1,16 @@
 #!/bin/bash
 
-# Ask for inputs with defaults
-read -e -p "Enter mount point: " -i "$HOME/mnt/smbshare" MOUNT_POINT
-read -e -p "Enter local mirror path: " -i "$HOME/mirror/smbshare" MIRROR_PATH
-read -e -p "Enter remote address (e.g. //server/share): " -i "//192.168.1.100/shared" REMOTE_ADDR
-read -e -p "Enter SMB username: " -i "guest" SMB_USER
+# Default values
+DEF_MOUNT="$HOME/mnt/smbshare"
+DEF_MIRROR="$HOME/mirror/smbshare"
+DEF_REMOTE="//192.168.1.100/shared"
+DEF_USER="guest"
+
+# Ask for inputs with visible defaults
+read -e -p "Enter mount point (default: $DEF_MOUNT): " -i "$DEF_MOUNT" MOUNT_POINT
+read -e -p "Enter local mirror path (default: $DEF_MIRROR): " -i "$DEF_MIRROR" MIRROR_PATH
+read -e -p "Enter remote address (default: $DEF_REMOTE): " -i "$DEF_REMOTE" REMOTE_ADDR
+read -e -p "Enter SMB username (default: $DEF_USER): " -i "$DEF_USER" SMB_USER
 read -sp "Enter SMB password: " SMB_PASS
 echo
 
