@@ -38,4 +38,4 @@ To remove the synchronization setup **without deleting your data**, run the unin
 
 ```bash
 curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh | bash
-‍‍‍```
+```
