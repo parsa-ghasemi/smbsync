@@ -40,5 +40,5 @@ bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/inst
 
 
 ```bash
-sudo bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh)
+curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh | bash
 ```
