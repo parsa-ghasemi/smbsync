@@ -37,4 +37,5 @@ bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/inst
 To remove the synchronization setup **without deleting your data**, run the uninstall script:
 
 ```bash
-sudo bash <(curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh)
+curl -s https://raw.githubusercontent.com/parsa-ghasemi/smbsync/main/uninstall.sh | bash
+‍‍‍```
