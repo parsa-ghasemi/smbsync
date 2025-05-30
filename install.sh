@@ -82,7 +82,7 @@ sudo "$HOME/.smbsync/mount.sh"
 echo "Running Unison sync..."
 
 # Run unison two-way sync, auto accept, batch mode, log output
-unison "$MOUNT_POINT" "$LOCAL_SYNC" -auto -batch -logfile "$HOME/.smbsync/unison.log"
+unison "$LOCAL_SYNC" "$MOUNT_POINT" -auto -batch -logfile "$HOME/.smbsync/unison.log" -prefer newer -copyonconflict
 EOF
 chmod +x "$WORKDIR/unison-sync.sh"
 
