@@ -64,47 +64,28 @@ cat > "$WORKDIR/unison-sync.sh" <<'EOF'
 #!/bin/bash
 set -euo pipefail
 
+# Detect real user home (if run with sudo)
 if [ -n "${SUDO_USER-}" ]; then
   REAL_HOME=$(eval echo "~$SUDO_USER")
 else
   REAL_HOME="$HOME"
 fi
 
+# Load config
 source "$REAL_HOME/.smbsync/config.env"
 
+# Ensure mount
 sudo "$REAL_HOME/.smbsync/mount.sh"
+
+# Run permission fixer in background
+bash "$REAL_HOME/.smbsync/autochmod.sh" &
+sleep 2  # give it a moment to catch up
 
 echo "Running Unison sync..."
 
+# Run unison
 unison "$MOUNT_POINT" "$LOCAL_SYNC" -auto -batch -logfile "$REAL_HOME/.smbsync/unison.log"
-EOF
-chmod +x "$WORKDIR/unison-sync.sh"
 
-# Create autochmod.sh
-cat > "$WORKDIR/autochmod.sh" <<'EOF'
-#!/bin/bash
-set -euo pipefail
-
-if [ -n "${SUDO_USER-}" ]; then
-  REAL_HOME=$(eval echo "~$SUDO_USER")
-else
-  REAL_HOME="$HOME"
-fi
-
-source "$REAL_HOME/.smbsync/config.env"
-
-echo "Starting auto chmod watcher on $LOCAL_SYNC"
-
-inotifywait -m -r -e create -e moved_to -e close_write --format '%w%f' "$LOCAL_SYNC" | while read -r NEWFILE
-do
-  if [ -f "$NEWFILE" ]; then
-    chmod 755 "$NEWFILE"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Set 755 for file $NEWFILE" >> "$REAL_HOME/.smbsync/autochmod.log"
-  elif [ -d "$NEWFILE" ]; then
-    chmod 755 "$NEWFILE"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Set 755 for dir $NEWFILE" >> "$REAL_HOME/.smbsync/autochmod.log"
-  fi
-done
 EOF
 chmod +x "$WORKDIR/autochmod.sh"
 
