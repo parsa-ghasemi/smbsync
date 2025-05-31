@@ -95,13 +95,19 @@ source "$REAL_HOME/.smbsync/config.env"
 
 echo "Starting auto chmod watcher on $LOCAL_SYNC"
 
-inotifywait -m -r -e create --format '%w%f' "$LOCAL_SYNC" | while read -r NEWFILE
+inotifywait -m -r -e create -e moved_to -e close_write --format '%w%f' "$LOCAL_SYNC" | while read -r NEWFILE
 do
-  echo "$(date '+%Y-%m-%d %H:%M:%S') Fixing permissions for $NEWFILE" >> "$REAL_HOME/.smbsync/autochmod.log"
-  chmod 755 "$NEWFILE"
+  if [ -f "$NEWFILE" ]; then
+    chmod 755 "$NEWFILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Set 755 for file $NEWFILE" >> "$REAL_HOME/.smbsync/autochmod.log"
+  elif [ -d "$NEWFILE" ]; then
+    chmod 755 "$NEWFILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Set 755 for dir $NEWFILE" >> "$REAL_HOME/.smbsync/autochmod.log"
+  fi
 done
 EOF
 chmod +x "$WORKDIR/autochmod.sh"
+
 
 # Prepare log files
 touch "$WORKDIR/unison.log" "$WORKDIR/autochmod.log"
