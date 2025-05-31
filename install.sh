@@ -32,7 +32,8 @@ cat > "$WORKDIR/mount.sh" <<'EOF'
 set -euo pipefail
 
 REAL_USER="${SUDO_USER:-$USER}"
-CONFIG_PATH=$(eval echo "~$REAL_USER/.smbsync/config.env")
+REAL_HOME=$(eval echo "~$REAL_USER")
+CONFIG_PATH="$REAL_HOME/.smbsync/config.env"
 source "$CONFIG_PATH"
 
 if mountpoint -q "$MOUNT_POINT"; then
